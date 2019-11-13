@@ -464,4 +464,99 @@ namespace ORMDataBase
 
         }
     }
+    public class FileCache
+    {
+        public string path;
+        public object obj;
+        public byte counter = 0;
+        int TimeSpawn = Environment.TickCount;
+
+        public static bool working = true;
+        public static List<FileCache> fileCaches = new List<FileCache>();
+
+        public FileCache(string path, object obj, byte counter = 1, int timeSpawn = -1)
+        {
+            if (timeSpawn == -1)
+                timeSpawn = Environment.TickCount;
+            this.path = path;
+            this.obj = obj;
+            this.counter = counter;
+            TimeSpawn = timeSpawn;
+        }
+        const int OverHead = 1000;
+        const int OverClean = 500;
+        const int TimeToLive = 30000;
+        public static bool GetFileFromCache(string path, out FileCache str)
+        {
+            lock (fileCaches)
+            {
+                for (; OverHead < fileCaches.Count;)
+                {
+                    fileCaches.RemoveAt(0);
+                }
+                for (int i = 0; i < fileCaches.Count; i++)
+                {
+                    if (fileCaches[i] == null)
+                    {
+                        fileCaches.RemoveAt(i);
+                        i--;
+                    }
+                    else if (Environment.TickCount - fileCaches[i].TimeSpawn >= TimeToLive)
+                    {
+                        fileCaches.RemoveAt(i);
+                        i--;
+                    }
+                }
+                for (; OverClean < fileCaches.Count;)
+                {
+                    int min = 0;
+                    for (int i = 1; i < fileCaches.Count; i++)
+                    {
+                        if (fileCaches[min].counter > fileCaches[i].counter)
+                        {
+                            min = i;
+                        }
+                    }
+                    fileCaches.RemoveAt(min);
+                }
+                if (!working)
+                {
+                    str = null;
+                    return false;
+                }
+                for (int i = 0; i < fileCaches.Count; i++)
+                {
+                    if (fileCaches[i].path == path)
+                    {
+                        fileCaches[i].counter++;
+                        str = fileCaches[i];
+                        return true;
+                    }
+                }
+                str = null;
+                return false;
+            }
+        }
+        /// <summary>
+        /// Выгружает из кэша объекты имеющие префикс TagPrefixies
+        /// </summary>
+        /// <param name="TagPrefixies">Префиксы нуждающиеся в удалении</param>
+        public static void ClearCache(params string[] TagPrefixies)
+        {
+            lock (fileCaches)
+            {
+                for (int i = 0; i < TagPrefixies.Length; i++)
+                {
+                    for (int j = 0; j < fileCaches.Count; j++)
+                    {
+                        if (fileCaches[j].path.StartsWith(TagPrefixies[i]))
+                        {
+                            fileCaches.RemoveAt(j);
+                            j--;
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
